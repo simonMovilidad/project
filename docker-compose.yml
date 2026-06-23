@@ -1,0 +1,73 @@
+version: "3.9"
+
+services:
+  db:
+    image: timescale/timescaledb:latest-pg15
+    container_name: simon_movilidad_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: telemetry_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: apache/kafka:latest
+    container_name: simon_movilidad_kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+    ports:
+      - "9092:9092"
+
+  redis:
+    image: redis:alpine
+    container_name: simon_movilidad_redis
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./backend
+    container_name: simon_movilidad_backend
+    depends_on:
+      db:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://postgres:password@db:5432/telemetry_db
+      KAFKA_BROKER: kafka:9092
+      PORT: 3002
+    ports:
+      - "3002:3002"
+    command: >
+      sh -c "npx prisma db push --skip-generate && node dist/main.js"
+
+  frontend:
+    build: ./frontend
+    container_name: simon_movilidad_frontend
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3002
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:

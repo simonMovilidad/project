@@ -1,0 +1,9 @@
+[submodule "frontend"]
+	path = frontend
+	url = https://github.com/simonMovilidad/frontend.git
+[submodule "backend"]
+	path = backend
+	url = https://github.com/simonMovilidad/backend.git
+[submodule "mobile"]
+	path = mobile
+	url = https://github.com/simonMovilidad/mobile.git

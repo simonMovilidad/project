@@ -41,6 +41,82 @@ git submodule update --remote --merge
 
 ---
 
+## 🔐 Variables de Entorno
+
+Cada submódulo usa su propio archivo `.env` en su directorio. Puedes copiar los ejemplos y ajustar según tu entorno (local, Docker o dispositivo físico).
+
+### Backend (`backend/.env`)
+
+| Variable | Requerida | Descripción | Valor por defecto / ejemplo |
+|----------|-----------|-------------|----------------------------|
+| `DATABASE_URL` | **Sí** | Conexión PostgreSQL/TimescaleDB para Prisma | `postgresql://postgres:password@localhost:5433/telemetry_db` |
+| `KAFKA_BROKER` | No | Host:puerto del broker Kafka | `localhost:9092` |
+| `PORT` | No | Puerto HTTP del API NestJS | `3002` |
+| `OPENAI_API_KEY` | No | API key de OpenAI para el fallback del agente IA (`/ai/chat`). Sin ella, el intent parser local sigue funcionando | — |
+
+Ejemplo `backend/.env`:
+
+```env
+DATABASE_URL=postgresql://postgres:password@localhost:5433/telemetry_db
+KAFKA_BROKER=localhost:9092
+PORT=3002
+OPENAI_API_KEY=sk-...
+```
+
+> **Nota:** Con `docker compose up -d` (solo infra), la base expone el puerto **5433** en el host (`5433:5432`). Si el backend corre dentro de Docker Compose, usa `db:5432` como en el `docker-compose.yml`.
+
+---
+
+### Frontend (`frontend/.env`)
+
+| Variable | Requerida | Descripción | Valor por defecto / ejemplo |
+|----------|-----------|-------------|----------------------------|
+| `NEXT_PUBLIC_API_URL` | No | URL base del backend (REST: vehículos, alertas, chat IA) | `http://localhost:3002` |
+| `NEXT_PUBLIC_WS_URL` | No | URL del servidor WebSocket (namespace `/events`) | `http://localhost:3002` |
+
+Ejemplo `frontend/.env`:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3002
+NEXT_PUBLIC_WS_URL=http://localhost:3002
+```
+
+> Las variables `NEXT_PUBLIC_*` se embeben en el bundle del cliente. En producción apunta a la URL pública del backend.
+
+---
+
+### Mobile (`mobile/.env`)
+
+| Variable | Requerida | Descripción | Valor por defecto / ejemplo |
+|----------|-----------|-------------|----------------------------|
+| `EXPO_PUBLIC_BACKEND_URL` | No | URL base del backend para enviar telemetría (`POST /telemetry/ingest`) | `http://localhost:3002` |
+
+Ejemplo `mobile/.env`:
+
+```env
+# Emulador / misma máquina
+EXPO_PUBLIC_BACKEND_URL=http://localhost:3002
+
+# Dispositivo físico (usa la IP de tu PC en la red local)
+# EXPO_PUBLIC_BACKEND_URL=http://192.168.1.X:3002
+```
+
+> En dispositivo físico **no uses** `localhost`; debe ser la IP de la máquina donde corre el backend.
+
+---
+
+### Raíz (opcional — pruebas de carga k6)
+
+| Variable | Requerida | Descripción | Valor por defecto |
+|----------|-----------|-------------|-------------------|
+| `BASE_URL` | No | Endpoint de ingesta para `load-test.js` | `http://localhost:3002/telemetry/ingest` |
+
+```bash
+BASE_URL=http://localhost:3002/telemetry/ingest k6 run load-test.js
+```
+
+---
+
 ## 🚀 Arquitectura y Decisiones (DDD & Clean Architecture)
 
 1. **Ingesta Orientada a Eventos:**
@@ -68,6 +144,9 @@ docker compose up -d
 ```
 
 ### 2. Backend (NestJS)
+
+Crea `backend/.env` con al menos `DATABASE_URL` (ver [variables de entorno](#-variables-de-entorno)).
+
 ```bash
 cd backend
 npm install
@@ -83,6 +162,9 @@ npx ts-node setup_timescale.ts
 ```
 
 ### 3. Portal Web (Next.js)
+
+Crea `frontend/.env` con `NEXT_PUBLIC_API_URL` y `NEXT_PUBLIC_WS_URL` (ver [variables de entorno](#-variables-de-entorno)).
+
 ```bash
 cd frontend
 npm install
@@ -91,14 +173,13 @@ npm run dev
 El portal estará disponible en `http://localhost:3000`.
 
 ### 4. App Móvil (React Native / Expo)
+
+Crea `mobile/.env` con `EXPO_PUBLIC_BACKEND_URL` (ver [variables de entorno](#-variables-de-entorno)).
+
 ```bash
 cd mobile
 npm install
 npm run start
-```
-Configura `EXPO_PUBLIC_BACKEND_URL` en `mobile/.env` con la IP de tu máquina si usas dispositivo físico:
-```
-EXPO_PUBLIC_BACKEND_URL=http://192.168.1.X:3002
 ```
 
 ### 5. Pruebas de Caos (k6)
